@@ -102,7 +102,7 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 10. iii. Install a Pod Network (Flannel):
 kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
 
-11.  Join Worker Nodes to the Cluster (On worker nodes) {copy the token with command generated in step 10. i }
+11.  Join Worker Nodes to the Cluster (On worker nodes) OR {copy the token with command generated in step 10. i }
 sudo kubeadm join <master-node-ip>:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>
 
 12. On master node
