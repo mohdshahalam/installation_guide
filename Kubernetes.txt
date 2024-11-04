@@ -1,0 +1,113 @@
+# Steps:-
+
+# For Docker Installation
+sudo apt-get update
+sudo apt-get install docker.io -y
+sudo usermod -aG docker $USER && newgrp docker
+
+# For Minikube & Kubectl
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube 
+
+sudo snap install kubectl --classic
+minikube start --driver=docker
+
+if minikube is using
+then get URL using below command
+minikube service <serviec_name> --url
+	-- now you will get the url for the application
+
+if application is still not accessible, we can using port forwording
+
+kubectl port-forword <Service-name> -n <namespace> 8080:8080
+
+
+
+
+Installation of kubernetes cluster using kubeadm
+
+Pre-requisite
+-------------
+
+1. Port 6443 and 8080 ports are open on all nodes
+
+Steps on all nodes (master and worker)
+----------------------------------------
+1. Update the system:
+sudo apt update && sudo apt upgrade -y
+
+2. Disable Swap (Kubernetes requires that swap be disabled):
+sudo swapoff -a
+sudo sed -i '/ swap / s/^/#/' /etc/fstab
+
+3. Enable Kernel Modules:
+sudo modprobe overlay
+sudo modprobe br_netfilter
+
+4. Load Kernel Parameters: Create a configuration file with the following parameters:
+cat <<EOF | sudo tee /etc/sysctl.d/kubernetes.conf
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+EOF
+
+5. Then apply the configuration:
+sudo sysctl --system
+
+6. Install Container Runtime (Docker):
+sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io
+sudo mkdir -p /etc/containerd
+sudo containerd config default | sudo tee /etc/containerd/config.toml
+sudo sed -i -e 's/SystemdCgroup = false/SystemdCgroup = true/g' /etc/containerd/config.toml
+
+sudo systemctl restart containerd
+
+7. Configure Docker for Kubernetes: Create or update the Docker daemon configuration:
+cat <<EOF | sudo tee /etc/docker/daemon.json
+{
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m"
+  },
+  "storage-driver": "overlay2"
+}
+EOF
+
+8. Then restart the Docker
+sudo systemctl enable docker
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+
+9. Install kubeadm, kubelet, and kubectl:
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl
+sudo systemctl enable --now kubelet
+
+10. i. Initialize Kubernetes Control Plane on the Master Node
+sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+
+10 ii. Set up the kubeconfig for the master node:
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+10. iii. Install a Pod Network (Flannel):
+kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+
+11.  Join Worker Nodes to the Cluster (On worker nodes) {copy the token with command generated in step 10. i }
+sudo kubeadm join <master-node-ip>:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>
+
+12. On master node
+kubectl get nodes
+
+
+
+
